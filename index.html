@@ -858,8 +858,10 @@ function cycleBoolSingle(btn) {
   if (next === 'dc') {
     delete filters[col];
   } else {
-    // Store as yes→'Yes', no→'No' so applyFilters can match cell values
-    filters[col] = { [next === 'yes' ? 'Yes' : 'No']: next };
+    // Always key on 'Yes' — the cell value that exists in boolean columns.
+    // yes state → yesVals=['Yes'] → include rows where cell='Yes'
+    // no  state → noVals=['Yes']  → exclude rows where cell='Yes'
+    filters[col] = { 'Yes': next };
   }
   renderPills();
   applyFilters();
@@ -1040,4 +1042,3 @@ function escJs(s) {
 </script>
 </body>
 </html>
-
