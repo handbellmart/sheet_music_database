@@ -842,6 +842,25 @@ function cycleFilter(btn) {
   applyFilters();
 }
 
+// ── Boolean Yes/No toggle handler ────────────────────
+function cycleBool(btn) {
+  const col = btn.closest('.bool-toggle').dataset.col;
+  const val = btn.dataset.val;
+  const current = btn.dataset.state;
+  const next = current === 'dc' ? (val === 'Yes' ? 'yes' : 'no') : 'dc';
+  btn.dataset.state = next;
+
+  if (!filters[col]) filters[col] = {};
+  if (next === 'dc') {
+    delete filters[col][val];
+    if (Object.keys(filters[col]).length === 0) delete filters[col];
+  } else {
+    filters[col][val] = next;
+  }
+  renderPills();
+  applyFilters();
+}
+
 function clearAllFilters() {
   filters = {};
   document.querySelectorAll('.tri-btn').forEach(btn => {
@@ -1011,4 +1030,3 @@ function escJs(s) {
 </script>
 </body>
 </html>
-
