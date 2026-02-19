@@ -508,13 +508,26 @@ function buildTableHeader() {
   ).join('') + '</tr>';
 }
 
+// ── Helper: split a cell value by comma into trimmed tokens ──
+function splitCell(val) {
+  return String(val).split(',').map(s => s.trim()).filter(Boolean);
+}
+
 // ── Filter Sidebar ────────────────────────────────────
 function buildFilterSidebar() {
   const container = document.getElementById('filter-groups');
   container.innerHTML = '';
   const available = FILTER_COLS.filter(c => allData[0] && c in allData[0]);
   available.forEach(col => {
-    const values = [...new Set(allData.map(r => r[col]).filter(v => v && v.trim()))].sort();
+    // Collect every individual token across all rows (split on comma)
+    const values = [...new Set(
+      allData.flatMap(r => splitCell(r[col] || '')).filter(Boolean)
+    )].sort((a, b) => {
+      // Sort numerically if both look like numbers, otherwise alphabetically
+      const na = parseFloat(a), nb = parseFloat(b);
+      if (!isNaN(na) && !isNaN(nb)) return na - nb;
+      return a.localeCompare(b);
+    });
     if (values.length < 2) return;
     const group = document.createElement('div');
     group.className = 'filter-group';
@@ -527,7 +540,7 @@ function buildFilterSidebar() {
           <label>
             <input type="checkbox" data-col="${col}" value="${escHtml(v)}" onchange="onCheckbox(this)">
             <span>${escHtml(v)}</span>
-            <span class="count">${allData.filter(r=>r[col]===v).length}</span>
+            <span class="count">${allData.filter(r => splitCell(r[col]||'').includes(v)).length}</span>
           </label>`).join('')}
       </div>`;
     container.appendChild(group);
@@ -591,8 +604,10 @@ function applyFilters() {
   let rows = allData;
 
   // checkbox filters — AND across columns, OR within each column
+  // Cells may contain comma-separated values (e.g. "3, 5"), so we split each
+  // cell and check whether any token matches any checked filter value.
   Object.entries(filters).forEach(([col, vals]) => {
-    rows = rows.filter(r => vals.has(r[col]));
+    rows = rows.filter(r => splitCell(r[col] || '').some(token => vals.has(token)));
   });
 
   // text search
