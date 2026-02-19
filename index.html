@@ -446,6 +446,18 @@ const DISPLAY_COLS = [
 
 const TEXT_SEARCH_COLS = ['HM Code','HM Title','HM Alternate Title','Composer','Arranger','Arrangement of'];
 
+// ── Parse duration to seconds (handles plain numbers, m:ss, mm:ss) ──
+function parseDuration(val) {
+  if (!val && val !== 0) return NaN;
+  const s = String(val).trim();
+  // mm:ss or m:ss format
+  const colonMatch = s.match(/^(\d+):(\d{2})$/);
+  if (colonMatch) return parseInt(colonMatch[1]) * 60 + parseInt(colonMatch[2]);
+  // plain number (already seconds)
+  const n = parseFloat(s);
+  return isNaN(n) ? NaN : n;
+}
+
 // ── Duration range buckets (in seconds) ──────────────
 const DURATION_BUCKETS = [
   { label: '< 1 min',   min: 0,   max: 60   },
@@ -556,7 +568,7 @@ function buildFilterSidebar() {
       <div class="filter-group-body">
         ${DURATION_BUCKETS.map(b => {
           const count = allData.filter(r => {
-            const s = parseFloat(r['Duration']);
+            const s = parseDuration(r['Duration']);
             return !isNaN(s) && s >= b.min && s < b.max;
           }).length;
           return `<label>
@@ -671,7 +683,7 @@ function applyFilters() {
   if (filters['__duration__']) {
     const activeBuckets = DURATION_BUCKETS.filter(b => filters['__duration__'].has(b.label));
     rows = rows.filter(r => {
-      const s = parseFloat(r['Duration']);
+      const s = parseDuration(r['Duration']);
       if (isNaN(s)) return false;
       return activeBuckets.some(b => s >= b.min && s < b.max);
     });
