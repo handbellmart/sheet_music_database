@@ -402,12 +402,8 @@
 
   <main>
     <div class="upload-zone" id="upload-zone">
-      <h2>Load Your Spreadsheet</h2>
-      <p>Export your handbell catalog as a CSV file from Excel, then upload it here.<br>
-      Column headers should match exactly (HM Code, HM Title, Publisher, etc.)</p>
-      <button class="upload-btn" onclick="document.getElementById('file-input').click()">Upload CSV File</button>
-      <button class="sample-btn" onclick="loadSampleData()">Try Sample Data</button>
-      <input type="file" id="file-input" accept=".csv,.tsv" onchange="handleFile(event)">
+      <h2>Loading Catalog…</h2>
+      <p>Fetching the handbell music catalog, please wait.</p>
     </div>
 
     <div id="search-area" style="display:none">
@@ -456,36 +452,25 @@ let filters = {}; // { col: Set of values }
 let sortCol = null;
 let sortDir = 1;
 
-// ── File Loading ─────────────────────────────────────
-function handleFile(e) {
-  const file = e.target.files[0];
-  if (!file) return;
-  Papa.parse(file, {
+// ── Auto-load from Google Drive ───────────────────────
+const GDRIVE_FILE_ID = '1dveniU-emPY4Zwv-7f016gn0TSfiyy-p';
+const GDRIVE_URL = 'https://drive.google.com/uc?export=download&id=' + GDRIVE_FILE_ID;
+
+function loadFromGDrive() {
+  Papa.parse(GDRIVE_URL, {
+    download: true,
     header: true,
     skipEmptyLines: true,
-    complete: r => initData(r.data)
+    complete: r => initData(r.data),
+    error: function(err) {
+      var zone = document.getElementById('upload-zone');
+      zone.innerHTML = '<h2>Could Not Load Catalog</h2><p>The file could not be fetched. This is usually a CORS restriction when opening locally. Host this file on a web server and ensure the Google Drive file is shared publicly.</p>';
+    }
   });
 }
 
-function loadSampleData() {
-  const cols = ['HM Code','HM Title','HM Alternate Title','Arrangement of','Publisher','Type','Composer','Arranger','Level','Octaves of bells','Octaves of chimes','Occasion','Duration','Key signature changes','Accidentals','Key signature(s)','Time signature changes','Time signature(s)','Notes','Repeats','Techniques','Original copyright','Current copyright','Number of pages','Link to buy','Link to listen/view'];
-  const sample = [
-    ['HB001','Gloria in Excelsis','Glory Song','Traditional','Agape','Sacred','arr. Trad.','John Smith','Level 3','3','2','Christmas','3:20','No','Yes','G major','No','4/4','Ring clearly','Yes','Martellato, Mallets','1985','2010','4','https://example.com','https://youtube.com'],
-    ['HB002','A Mighty Fortress','','Bach','Choristers Guild','Sacred','J.S. Bach','Mary Johnson','Level 2','2','0','General','2:45','No','No','D major','No','4/4','Standard','No','Basic Ringing','1999','2005','3','','https://youtube.com'],
-    ['HB003','Joy to the World','','Handel/Watts','Hope Publishing','Sacred','G.F. Handel','Robert Lee','Level 4','5','3','Christmas','2:00','No','Yes','D major','Yes','2/4, 4/4','','Yes','Gyro, Martellato','1990','2015','6','https://example.com',''],
-    ['HB004','Amazing Grace','','Traditional','Agape','Sacred','Trad.','Susan Park','Level 1','2','0','General','3:00','No','No','F major','No','3/4','','No','Basic Ringing','2001','2001','2','','https://youtube.com'],
-    ['HB005','Joyful Joyful','Hymn to Joy','Beethoven','Lorenz','Sacred','L. van Beethoven','David Kim','Level 3','3','2','General','2:30','No','No','Bb major','No','4/4','','Yes','Mallets','1995','2008','4','https://example.com','https://youtube.com'],
-    ['HB006','Spring Suite','','Original','Carl Fischer','Secular','Patricia Moore','Patricia Moore','Level 5','5','4','Spring','5:00','Yes','Yes','C major','Yes','3/4, 6/8','Complex piece','Yes','Gyro, Pluck, LV','2005','2020','10','https://example.com',''],
-    ['HB007','Alleluia','','Original','Agape','Sacred','William Jones','','Level 2','2','0','Easter','1:30','No','No','G major','No','4/4','','No','Basic Ringing','2010','2010','2','','https://youtube.com'],
-    ['HB008','Celtic Bells','','Original','Choristers Guild','Secular','Fiona Walsh','Fiona Walsh','Level 4','4','3','General','4:00','Yes','No','D minor','No','6/8','','Yes','Martellato, Gyro','2012','2018','7','https://example.com','https://youtube.com'],
-  ];
-  const data = sample.map(row => {
-    const obj = {};
-    cols.forEach((c,i) => obj[c] = row[i] || '');
-    return obj;
-  });
-  initData(data);
-}
+window.addEventListener('DOMContentLoaded', loadFromGDrive);
+
 
 // ── Init ─────────────────────────────────────────────
 function initData(data) {
