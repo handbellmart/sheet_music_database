@@ -882,7 +882,7 @@ function applyFilters() {
 
     // Regular columns
     if (yesVals.length > 0) {
-      rows = rows.filter(r => yesVals.some(v => splitCell(r[col] || '').includes(v)));
+      rows = rows.filter(r => yesVals.every(v => splitCell(r[col] || '').includes(v)));
     }
     if (noVals.length > 0) {
       rows = rows.filter(r => !noVals.some(v => splitCell(r[col] || '').includes(v)));
