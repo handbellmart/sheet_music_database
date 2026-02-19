@@ -776,9 +776,9 @@ function buildFilterSidebar() {
       </div>
       <div class="filter-group-body" id="${bodyId}">
         ${isBoolean ? `
-        <div class="bool-toggle" data-col="${escHtml(col)}">
-          <button class="bool-btn" data-state="dc" data-val="Yes" onclick="cycleBool(this)">Yes</button>
-          <button class="bool-btn" data-state="dc" data-val="No" onclick="cycleBool(this)">No</button>
+        <div class="filter-item">
+          <span class="tri-btn" data-state="dc" data-col="${escHtml(col)}" data-val="__bool__" onclick="cycleBoolSingle(this)">–</span>
+          <span class="filter-item-label" id="bool-label-${escHtml(col)}">Don't Care</span>
         </div>` :
         values.map(v => {
           const count = allData.filter(r => splitCell(r[col]||'').includes(v)).length;
@@ -842,20 +842,24 @@ function cycleFilter(btn) {
   applyFilters();
 }
 
-// ── Boolean Yes/No toggle handler ────────────────────
-function cycleBool(btn) {
-  const col = btn.closest('.bool-toggle').dataset.col;
-  const val = btn.dataset.val;
+// ── Boolean single tri-state button: dc → yes → no → dc ──
+function cycleBoolSingle(btn) {
+  const col = btn.dataset.col;
   const current = btn.dataset.state;
-  const next = current === 'dc' ? (val === 'Yes' ? 'yes' : 'no') : 'dc';
+  const next = current === 'dc' ? 'yes' : current === 'yes' ? 'no' : 'dc';
   btn.dataset.state = next;
+  btn.textContent = next === 'yes' ? '✓' : next === 'no' ? '✕' : '–';
+
+  // Update the label text
+  const label = document.getElementById('bool-label-' + col);
+  if (label) label.textContent = next === 'yes' ? 'Yes' : next === 'no' ? 'No' : "Don't Care";
 
   if (!filters[col]) filters[col] = {};
   if (next === 'dc') {
-    delete filters[col][val];
-    if (Object.keys(filters[col]).length === 0) delete filters[col];
+    delete filters[col];
   } else {
-    filters[col][val] = next;
+    // Store as yes→'Yes', no→'No' so applyFilters can match cell values
+    filters[col] = { [next === 'yes' ? 'Yes' : 'No']: next };
   }
   renderPills();
   applyFilters();
@@ -867,8 +871,11 @@ function clearAllFilters() {
     btn.dataset.state = 'dc';
     btn.textContent = '–';
   });
-  document.querySelectorAll('.bool-btn').forEach(btn => {
+  document.querySelectorAll('.tri-btn[data-val="__bool__"]').forEach(btn => {
     btn.dataset.state = 'dc';
+    btn.textContent = '–';
+    const label = document.getElementById('bool-label-' + btn.dataset.col);
+    if (label) label.textContent = "Don't Care";
   });
   document.getElementById('text-search').value = '';
   renderPills();
@@ -898,10 +905,13 @@ function removeTri(col, val) {
   // Reset tri-state button if present
   const triBtn = document.querySelector(`.tri-btn[data-col="${col}"][data-val="${val}"]`);
   if (triBtn) { triBtn.dataset.state = 'dc'; triBtn.textContent = '–'; }
-  // Reset bool button if present
-  const boolBtn = document.querySelector(`.bool-btn[data-val="${val}"]`);
-  if (boolBtn && boolBtn.closest('.bool-toggle').dataset.col === col) {
+  // Reset single bool button if present
+  const boolBtn = document.querySelector(`.tri-btn[data-col="${col}"][data-val="__bool__"]`);
+  if (boolBtn) {
     boolBtn.dataset.state = 'dc';
+    boolBtn.textContent = '–';
+    const label = document.getElementById('bool-label-' + col);
+    if (label) label.textContent = "Don't Care";
   }
   renderPills();
   applyFilters();
@@ -1030,3 +1040,4 @@ function escJs(s) {
 </script>
 </body>
 </html>
+
