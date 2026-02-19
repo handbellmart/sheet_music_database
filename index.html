@@ -343,6 +343,84 @@
   }
   .empty-state p { font-size: 0.82rem; font-weight: 300; }
 
+  /* ── Column toggle button ── */
+  .col-toggle-btn {
+    background: none;
+    border: 1px solid #4a4030;
+    color: var(--parchment);
+    font-family: 'Libre Franklin', sans-serif;
+    font-size: 0.75rem;
+    font-weight: 400;
+    letter-spacing: 0.06em;
+    padding: 5px 12px;
+    cursor: pointer;
+    border-radius: 2px;
+    transition: all 0.15s;
+    white-space: nowrap;
+    align-self: center;
+  }
+  .col-toggle-btn:hover { background: #3a3028; border-color: var(--gold); color: var(--gold-light); }
+
+  /* ── Column panel ── */
+  #col-panel {
+    background: var(--parchment);
+    border-bottom: 2px solid var(--rule);
+    padding: 0;
+  }
+  .col-panel-inner { max-width: 100%; }
+  .col-panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 20px;
+    background: #ede8de;
+    border-bottom: 1px solid var(--rule);
+    font-family: 'Playfair Display', serif;
+    font-style: italic;
+    font-size: 0.95rem;
+    color: var(--gold);
+  }
+  .col-action-btn {
+    font-family: 'Libre Franklin', sans-serif;
+    font-size: 0.68rem;
+    font-weight: 500;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    background: none;
+    border: 1px solid var(--rule);
+    color: #5a5040;
+    padding: 3px 9px;
+    cursor: pointer;
+    border-radius: 2px;
+    transition: all 0.15s;
+  }
+  .col-action-btn:hover { background: var(--ink); color: var(--parchment); border-color: var(--ink); }
+  .col-close { border-color: var(--rust); color: var(--rust); }
+  .col-close:hover { background: var(--rust); color: white; border-color: var(--rust); }
+  .col-panel-body {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 12px;
+    padding: 12px 20px;
+  }
+  .col-panel-body label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.78rem;
+    font-weight: 300;
+    cursor: pointer;
+    color: #3a3028;
+    white-space: nowrap;
+    padding: 3px 8px;
+    border: 1px solid var(--rule);
+    border-radius: 2px;
+    background: white;
+    transition: all 0.1s;
+  }
+  .col-panel-body label:hover { border-color: var(--gold); color: var(--gold); }
+  .col-panel-body input[type=checkbox] { accent-color: var(--gold); cursor: pointer; }
+
   /* scrollbar styling */
   aside::-webkit-scrollbar,
   .filter-group-body::-webkit-scrollbar { width: 4px; }
@@ -389,6 +467,7 @@
     <p>Search &amp; Filter Your Library</p>
   </div>
   <div class="result-count" id="result-count"></div>
+  <button class="col-toggle-btn" onclick="toggleColPanel()">⊞ Columns</button>
 </header>
 
 <div class="layout">
@@ -404,6 +483,21 @@
     <div class="upload-zone" id="upload-zone">
       <h2>Loading Catalog…</h2>
       <p>Fetching the handbell music catalog, please wait.</p>
+    </div>
+
+    <div id="col-panel" style="display:none">
+      <div class="col-panel-inner">
+        <div class="col-panel-header">
+          <span>Show / Hide Columns</span>
+          <div style="display:flex;gap:8px;">
+            <button class="col-action-btn" onclick="setAllCols(true)">All</button>
+            <button class="col-action-btn" onclick="setAllCols(false)">None</button>
+            <button class="col-action-btn" onclick="resetCols()">Reset</button>
+            <button class="col-action-btn col-close" onclick="toggleColPanel()">✕ Close</button>
+          </div>
+        </div>
+        <div class="col-panel-body" id="col-checkboxes"></div>
+      </div>
     </div>
 
     <div id="search-area" style="display:none">
@@ -443,6 +537,14 @@ const DISPLAY_COLS = [
   'Duration','Key signature(s)','Time signature(s)',
   'Techniques','Link to buy','Link to listen/view'
 ];
+
+const DEFAULT_COLS = [
+  'HM Title','Arrangement of','Composer','Arranger','Publisher',
+  'Type','Level','Octaves of bells','Octaves of chimes',
+  'Key signature(s)','Duration'
+];
+
+let visibleCols = [...DEFAULT_COLS];
 
 const TEXT_SEARCH_COLS = ['HM Code','HM Title','HM Alternate Title','Composer','Arranger','Arrangement of'];
 
@@ -505,7 +607,9 @@ function initData(data) {
   document.getElementById('upload-zone').style.display = 'none';
   document.getElementById('search-area').style.display = 'block';
   document.getElementById('results-table').style.display = 'table';
+  visibleCols = [...DEFAULT_COLS];
   buildTableHeader();
+  buildColPanel();
   buildFilterSidebar();
   applyFilters();
 }
@@ -513,10 +617,50 @@ function initData(data) {
 // ── Table Header ──────────────────────────────────────
 function buildTableHeader() {
   const head = document.getElementById('table-head');
-  const available = DISPLAY_COLS.filter(c => allData[0] && c in allData[0]);
+  const available = visibleCols.filter(c => allData[0] && c in allData[0]);
   head.innerHTML = '<tr>' + available.map(col =>
     `<th onclick="sortBy('${col}')" data-col="${col}">${col}</th>`
   ).join('') + '</tr>';
+}
+
+function buildColPanel() {
+  const container = document.getElementById('col-checkboxes');
+  container.innerHTML = DISPLAY_COLS
+    .filter(c => allData[0] && c in allData[0])
+    .map(col => `
+      <label>
+        <input type="checkbox" ${visibleCols.includes(col) ? 'checked' : ''}
+          onchange="toggleCol('${col}', this.checked)">
+        ${col}
+      </label>`).join('');
+}
+
+function toggleColPanel() {
+  const panel = document.getElementById('col-panel');
+  panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+}
+
+function toggleCol(col, show) {
+  if (show && !visibleCols.includes(col)) visibleCols.push(col);
+  else if (!show) visibleCols = visibleCols.filter(c => c !== col);
+  // preserve DISPLAY_COLS order
+  visibleCols.sort((a,b) => DISPLAY_COLS.indexOf(a) - DISPLAY_COLS.indexOf(b));
+  buildTableHeader();
+  applyFilters();
+}
+
+function setAllCols(show) {
+  visibleCols = show ? [...DISPLAY_COLS].filter(c => allData[0] && c in allData[0]) : [];
+  buildColPanel();
+  buildTableHeader();
+  applyFilters();
+}
+
+function resetCols() {
+  visibleCols = [...DEFAULT_COLS];
+  buildColPanel();
+  buildTableHeader();
+  applyFilters();
 }
 
 // ── Helper: split a cell value by comma into trimmed tokens ──
@@ -713,7 +857,7 @@ function applyFilters() {
 
 // ── Table Render ──────────────────────────────────────
 function renderTable(rows) {
-  const available = DISPLAY_COLS.filter(c => allData[0] && c in allData[0]);
+  const available = visibleCols.filter(c => allData[0] && c in allData[0]);
   const tbody = document.getElementById('table-body');
   const empty = document.getElementById('empty-state');
   if (rows.length === 0) {
