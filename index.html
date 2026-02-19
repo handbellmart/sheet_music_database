@@ -428,6 +428,64 @@
   .filter-group-body::-webkit-scrollbar-track { background: transparent; }
   aside::-webkit-scrollbar-thumb { background: var(--rule); border-radius: 2px; }
 
+  /* ── Tri-state filter buttons ── */
+  .filter-group-body label {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    font-size: 0.8rem;
+    font-weight: 300;
+    padding: 0;
+    cursor: default;
+    color: #35335a;
+  }
+  .filter-group-body label:hover { color: #35335a; border: none; background: none; }
+  .tri-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    border: 1.5px solid #c8c7dc;
+    background: white;
+    cursor: pointer;
+    font-size: 0.7rem;
+    font-weight: 700;
+    flex-shrink: 0;
+    transition: all 0.15s;
+    user-select: none;
+    margin-right: 7px;
+  }
+  .tri-btn[data-state="yes"] {
+    background: var(--gold);
+    border-color: var(--gold);
+    color: white;
+  }
+  .tri-btn[data-state="no"] {
+    background: #c0392b;
+    border-color: #c0392b;
+    color: white;
+  }
+  .tri-btn[data-state="dc"] {
+    background: white;
+    border-color: #c8c7dc;
+    color: #a8a6c8;
+  }
+  .tri-btn:hover { border-color: var(--gold); }
+  .filter-item {
+    display: flex;
+    align-items: center;
+    padding: 3px 0;
+    width: 100%;
+  }
+  .filter-item-label { flex: 1; font-size: 0.8rem; font-weight: 300; color: #35335a; }
+  .filter-item-count { font-size: 0.68rem; color: #a8a6c8; font-weight: 300; margin-left: 4px; }
+
+  /* ── Pill colours for yes/no ── */
+  .pill-yes { background: var(--ink); }
+  .pill-no  { background: #c0392b; }
+
   /* Active filter pills */
   .active-filters {
     display: flex;
@@ -577,7 +635,7 @@ const DURATION_BUCKETS = [
 
 // ── State ───────────────────────────────────────────
 let allData = [];
-let filters = {}; // { col: Set of values }
+let filters = {}; // { col: { value: 'yes'|'no' } } — 'dc' (don't care) means absent
 let sortCol = null;
 let sortDir = 1;
 
@@ -674,11 +732,9 @@ function buildFilterSidebar() {
   container.innerHTML = '';
   const available = FILTER_COLS.filter(c => allData[0] && c in allData[0]);
   available.forEach(col => {
-    // Collect every individual token across all rows (split on comma)
     const values = [...new Set(
       allData.flatMap(r => splitCell(r[col] || '')).filter(Boolean)
     )].sort((a, b) => {
-      // Sort numerically if both look like numbers, otherwise alphabetically
       const na = parseFloat(a), nb = parseFloat(b);
       if (!isNaN(na) && !isNaN(nb)) return na - nb;
       return a.localeCompare(b);
@@ -686,17 +742,20 @@ function buildFilterSidebar() {
     if (values.length < 2) return;
     const group = document.createElement('div');
     group.className = 'filter-group';
+    const bodyId = 'fg-' + col.replace(/[^a-z0-9]/gi, '_');
     group.innerHTML = `
       <div class="filter-group-header" onclick="toggleGroup(this)">
         <span>${col}</span><span class="arrow">▾</span>
       </div>
-      <div class="filter-group-body">
-        ${values.map(v => `
-          <label>
-            <input type="checkbox" data-col="${col}" value="${escHtml(v)}" onchange="onCheckbox(this)">
-            <span>${escHtml(v)}</span>
-            <span class="count">${allData.filter(r => splitCell(r[col]||'').includes(v)).length}</span>
-          </label>`).join('')}
+      <div class="filter-group-body" id="${bodyId}">
+        ${values.map(v => {
+          const count = allData.filter(r => splitCell(r[col]||'').includes(v)).length;
+          return `<div class="filter-item">
+            <span class="tri-btn" data-state="dc" data-col="${escHtml(col)}" data-val="${escHtml(v)}" onclick="cycleFilter(this)">–</span>
+            <span class="filter-item-label">${escHtml(v)}</span>
+            <span class="filter-item-count">${count}</span>
+          </div>`;
+        }).join('')}
       </div>`;
     container.appendChild(group);
   });
@@ -715,11 +774,11 @@ function buildFilterSidebar() {
             const s = parseDuration(r['Duration']);
             return !isNaN(s) && s >= b.min && s < b.max;
           }).length;
-          return `<label>
-            <input type="checkbox" data-col="Duration" data-bucket="${escHtml(b.label)}" value="${escHtml(b.label)}" onchange="onDurationCheckbox(this)">
-            <span>${escHtml(b.label)}</span>
-            <span class="count">${count}</span>
-          </label>`;
+          return `<div class="filter-item">
+            <span class="tri-btn" data-state="dc" data-col="__duration__" data-val="${escHtml(b.label)}" onclick="cycleFilter(this)">–</span>
+            <span class="filter-item-label">${escHtml(b.label)}</span>
+            <span class="filter-item-count">${count}</span>
+          </div>`;
         }).join('')}
       </div>`;
     container.appendChild(durationGroup);
@@ -731,28 +790,21 @@ function toggleGroup(header) {
   header.nextElementSibling.classList.toggle('open');
 }
 
-// ── Checkbox Handling ──────────────────────────────────
-function onCheckbox(cb) {
-  const col = cb.dataset.col;
-  const val = cb.value;
-  if (!filters[col]) filters[col] = new Set();
-  if (cb.checked) filters[col].add(val);
-  else {
-    filters[col].delete(val);
-    if (filters[col].size === 0) delete filters[col];
-  }
-  renderPills();
-  applyFilters();
-}
+// ── Tri-state filter cycle: dc → yes → no → dc ──────────
+function cycleFilter(btn) {
+  const col = btn.dataset.col;
+  const val = btn.dataset.val;
+  const current = btn.dataset.state;
+  const next = current === 'dc' ? 'yes' : current === 'yes' ? 'no' : 'dc';
+  btn.dataset.state = next;
+  btn.textContent = next === 'yes' ? '✓' : next === 'no' ? '✕' : '–';
 
-// ── Duration checkbox handler ─────────────────────────
-function onDurationCheckbox(cb) {
-  const label = cb.value;
-  if (!filters['__duration__']) filters['__duration__'] = new Set();
-  if (cb.checked) filters['__duration__'].add(label);
-  else {
-    filters['__duration__'].delete(label);
-    if (filters['__duration__'].size === 0) delete filters['__duration__'];
+  if (!filters[col]) filters[col] = {};
+  if (next === 'dc') {
+    delete filters[col][val];
+    if (Object.keys(filters[col]).length === 0) delete filters[col];
+  } else {
+    filters[col][val] = next;
   }
   renderPills();
   applyFilters();
@@ -760,8 +812,10 @@ function onDurationCheckbox(cb) {
 
 function clearAllFilters() {
   filters = {};
-  document.querySelectorAll('input[type=checkbox]').forEach(cb => cb.checked = false);
-  delete filters['__duration__'];
+  document.querySelectorAll('.tri-btn').forEach(btn => {
+    btn.dataset.state = 'dc';
+    btn.textContent = '–';
+  });
   document.getElementById('text-search').value = '';
   renderPills();
   applyFilters();
@@ -770,43 +824,25 @@ function clearAllFilters() {
 function renderPills() {
   const container = document.getElementById('active-filters');
   container.innerHTML = '';
-  Object.entries(filters).forEach(([col, vals]) => {
-    if (col === '__duration__') {
-      vals.forEach(val => {
-        const pill = document.createElement('div');
-        pill.className = 'pill';
-        pill.innerHTML = `<span class="field">Duration:</span> ${escHtml(val)} <span class="remove" onclick="removeDurationPill('${escJs(val)}')">✕</span>`;
-        container.appendChild(pill);
-      });
-      return;
-    }
-    vals.forEach(val => {
+  Object.entries(filters).forEach(([col, valMap]) => {
+    const displayCol = col === '__duration__' ? 'Duration' : col;
+    Object.entries(valMap).forEach(([val, state]) => {
       const pill = document.createElement('div');
-      pill.className = 'pill';
-      pill.innerHTML = `<span class="field">${col}:</span> ${escHtml(val)} <span class="remove" onclick="removePill('${col}','${escJs(val)}')">✕</span>`;
+      pill.className = 'pill ' + (state === 'yes' ? 'pill-yes' : 'pill-no');
+      const icon = state === 'yes' ? '✓' : '✕';
+      pill.innerHTML = `<span style="opacity:0.7;font-size:0.65rem;">${icon}</span> <span class="field">${escHtml(displayCol)}:</span> ${escHtml(val)} <span class="remove" onclick="removeTri('${escJs(col)}','${escJs(val)}')">✕</span>`;
       container.appendChild(pill);
     });
   });
 }
 
-function removePill(col, val) {
+function removeTri(col, val) {
   if (filters[col]) {
-    filters[col].delete(val);
-    if (filters[col].size === 0) delete filters[col];
+    delete filters[col][val];
+    if (Object.keys(filters[col]).length === 0) delete filters[col];
   }
-  const cb = document.querySelector(`input[data-col="${col}"][value="${val}"]`);
-  if (cb) cb.checked = false;
-  renderPills();
-  applyFilters();
-}
-
-function removeDurationPill(val) {
-  if (filters['__duration__']) {
-    filters['__duration__'].delete(val);
-    if (filters['__duration__'].size === 0) delete filters['__duration__'];
-  }
-  const cb = document.querySelector(`input[data-col="Duration"][value="${val}"]`);
-  if (cb) cb.checked = false;
+  const btn = document.querySelector(`.tri-btn[data-col="${col}"][data-val="${val}"]`);
+  if (btn) { btn.dataset.state = 'dc'; btn.textContent = '–'; }
   renderPills();
   applyFilters();
 }
@@ -816,23 +852,42 @@ function applyFilters() {
   const query = (document.getElementById('text-search').value || '').toLowerCase().trim();
   let rows = allData;
 
-  // checkbox filters — AND across columns, OR within each column
-  // Cells may contain comma-separated values (e.g. "3, 5"), so we split each
-  // cell and check whether any token matches any checked filter value.
-  Object.entries(filters).forEach(([col, vals]) => {
-    if (col === '__duration__') return; // handled separately below
-    rows = rows.filter(r => splitCell(r[col] || '').some(token => vals.has(token)));
-  });
+  // Tri-state filters: each active filter entry is { val: 'yes'|'no' }
+  // YES values: row must contain AT LEAST ONE yes-value in that column
+  // NO values:  row must NOT contain ANY no-value in that column
+  // Duration uses special bucket matching via __duration__ key
+  Object.entries(filters).forEach(([col, valMap]) => {
+    const yesVals = Object.entries(valMap).filter(([,s]) => s === 'yes').map(([v]) => v);
+    const noVals  = Object.entries(valMap).filter(([,s]) => s === 'no').map(([v]) => v);
 
-  // duration range filter
-  if (filters['__duration__']) {
-    const activeBuckets = DURATION_BUCKETS.filter(b => filters['__duration__'].has(b.label));
-    rows = rows.filter(r => {
-      const s = parseDuration(r['Duration']);
-      if (isNaN(s)) return false;
-      return activeBuckets.some(b => s >= b.min && s < b.max);
-    });
-  }
+    if (col === '__duration__') {
+      // YES: row must fall in at least one yes bucket
+      if (yesVals.length > 0) {
+        const yesBuckets = DURATION_BUCKETS.filter(b => yesVals.includes(b.label));
+        rows = rows.filter(r => {
+          const s = parseDuration(r['Duration']);
+          return !isNaN(s) && yesBuckets.some(b => s >= b.min && s < b.max);
+        });
+      }
+      // NO: row must not fall in any no bucket
+      if (noVals.length > 0) {
+        const noBuckets = DURATION_BUCKETS.filter(b => noVals.includes(b.label));
+        rows = rows.filter(r => {
+          const s = parseDuration(r['Duration']);
+          return isNaN(s) || !noBuckets.some(b => s >= b.min && s < b.max);
+        });
+      }
+      return;
+    }
+
+    // Regular columns
+    if (yesVals.length > 0) {
+      rows = rows.filter(r => yesVals.some(v => splitCell(r[col] || '').includes(v)));
+    }
+    if (noVals.length > 0) {
+      rows = rows.filter(r => !noVals.some(v => splitCell(r[col] || '').includes(v)));
+    }
+  });
 
   // text search
   if (query) {
