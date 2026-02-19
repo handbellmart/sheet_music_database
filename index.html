@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">  
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Handbell Music Catalog</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
 <style>
@@ -446,6 +446,21 @@ const DISPLAY_COLS = [
 
 const TEXT_SEARCH_COLS = ['HM Code','HM Title','HM Alternate Title','Composer','Arranger','Arrangement of'];
 
+// ── Duration range buckets (in seconds) ──────────────
+const DURATION_BUCKETS = [
+  { label: '< 1 min',   min: 0,   max: 60   },
+  { label: '1-2 min',   min: 60,  max: 120  },
+  { label: '2-3 min',   min: 120, max: 180  },
+  { label: '3-4 min',   min: 180, max: 240  },
+  { label: '4-5 min',   min: 240, max: 300  },
+  { label: '5-6 min',   min: 300, max: 360  },
+  { label: '6-7 min',   min: 360, max: 420  },
+  { label: '7-8 min',   min: 420, max: 480  },
+  { label: '8-9 min',   min: 480, max: 540  },
+  { label: '9-10 min',  min: 540, max: 600  },
+  { label: '10+ min',   min: 600, max: Infinity },
+];
+
 // ── State ───────────────────────────────────────────
 let allData = [];
 let filters = {}; // { col: Set of values }
@@ -529,6 +544,30 @@ function buildFilterSidebar() {
       </div>`;
     container.appendChild(group);
   });
+
+  // ── Duration range filter group ──
+  if (allData[0] && 'Duration' in allData[0]) {
+    const durationGroup = document.createElement('div');
+    durationGroup.className = 'filter-group';
+    durationGroup.innerHTML = `
+      <div class="filter-group-header" onclick="toggleGroup(this)">
+        <span>Duration</span><span class="arrow">▾</span>
+      </div>
+      <div class="filter-group-body">
+        ${DURATION_BUCKETS.map(b => {
+          const count = allData.filter(r => {
+            const s = parseFloat(r['Duration']);
+            return !isNaN(s) && s >= b.min && s < b.max;
+          }).length;
+          return `<label>
+            <input type="checkbox" data-col="Duration" data-bucket="${escHtml(b.label)}" value="${escHtml(b.label)}" onchange="onDurationCheckbox(this)">
+            <span>${escHtml(b.label)}</span>
+            <span class="count">${count}</span>
+          </label>`;
+        }).join('')}
+      </div>`;
+    container.appendChild(durationGroup);
+  }
 }
 
 function toggleGroup(header) {
@@ -550,9 +589,23 @@ function onCheckbox(cb) {
   applyFilters();
 }
 
+// ── Duration checkbox handler ─────────────────────────
+function onDurationCheckbox(cb) {
+  const label = cb.value;
+  if (!filters['__duration__']) filters['__duration__'] = new Set();
+  if (cb.checked) filters['__duration__'].add(label);
+  else {
+    filters['__duration__'].delete(label);
+    if (filters['__duration__'].size === 0) delete filters['__duration__'];
+  }
+  renderPills();
+  applyFilters();
+}
+
 function clearAllFilters() {
   filters = {};
   document.querySelectorAll('input[type=checkbox]').forEach(cb => cb.checked = false);
+  delete filters['__duration__'];
   document.getElementById('text-search').value = '';
   renderPills();
   applyFilters();
@@ -562,6 +615,15 @@ function renderPills() {
   const container = document.getElementById('active-filters');
   container.innerHTML = '';
   Object.entries(filters).forEach(([col, vals]) => {
+    if (col === '__duration__') {
+      vals.forEach(val => {
+        const pill = document.createElement('div');
+        pill.className = 'pill';
+        pill.innerHTML = `<span class="field">Duration:</span> ${escHtml(val)} <span class="remove" onclick="removeDurationPill('${escJs(val)}')">✕</span>`;
+        container.appendChild(pill);
+      });
+      return;
+    }
     vals.forEach(val => {
       const pill = document.createElement('div');
       pill.className = 'pill';
@@ -582,6 +644,17 @@ function removePill(col, val) {
   applyFilters();
 }
 
+function removeDurationPill(val) {
+  if (filters['__duration__']) {
+    filters['__duration__'].delete(val);
+    if (filters['__duration__'].size === 0) delete filters['__duration__'];
+  }
+  const cb = document.querySelector(`input[data-col="Duration"][value="${val}"]`);
+  if (cb) cb.checked = false;
+  renderPills();
+  applyFilters();
+}
+
 // ── Filtering ─────────────────────────────────────────
 function applyFilters() {
   const query = (document.getElementById('text-search').value || '').toLowerCase().trim();
@@ -593,6 +666,16 @@ function applyFilters() {
   Object.entries(filters).forEach(([col, vals]) => {
     rows = rows.filter(r => splitCell(r[col] || '').some(token => vals.has(token)));
   });
+
+  // duration range filter
+  if (filters['__duration__']) {
+    const activeBuckets = DURATION_BUCKETS.filter(b => filters['__duration__'].has(b.label));
+    rows = rows.filter(r => {
+      const s = parseFloat(r['Duration']);
+      if (isNaN(s)) return false;
+      return activeBuckets.some(b => s >= b.min && s < b.max);
+    });
+  }
 
   // text search
   if (query) {
