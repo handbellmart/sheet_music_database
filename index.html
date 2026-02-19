@@ -428,6 +428,30 @@
   .filter-group-body::-webkit-scrollbar-track { background: transparent; }
   aside::-webkit-scrollbar-thumb { background: var(--rule); border-radius: 2px; }
 
+  /* ── Boolean Yes/No toggle ── */
+  .bool-toggle {
+    display: flex;
+    gap: 8px;
+    padding: 6px 0 4px;
+  }
+  .bool-btn {
+    flex: 1;
+    padding: 5px 0;
+    font-family: 'Libre Franklin', sans-serif;
+    font-size: 0.75rem;
+    font-weight: 500;
+    letter-spacing: 0.05em;
+    border-radius: 3px;
+    cursor: pointer;
+    border: 1.5px solid #c8c7dc;
+    background: white;
+    color: #a8a6c8;
+    transition: all 0.15s;
+  }
+  .bool-btn:hover { border-color: var(--gold); color: var(--gold); }
+  .bool-btn[data-state="yes"] { background: var(--gold); border-color: var(--gold); color: white; }
+  .bool-btn[data-state="no"]  { background: #c0392b; border-color: #c0392b; color: white; }
+
   /* ── Tri-state filter buttons ── */
   .filter-group-body label {
     display: flex;
@@ -588,6 +612,8 @@ const FILTER_COLS = [
   'Notes','Repeats','Techniques','Number of pages'
 ];
 
+const BOOLEAN_COLS = ['Key signature changes','Accidentals','Time signature changes','Repeats'];
+
 const DISPLAY_COLS = [
   'HM Code','HM Title','HM Alternate Title','Arrangement of',
   'Composer','Arranger','Publisher','Type','Level',
@@ -743,12 +769,18 @@ function buildFilterSidebar() {
     const group = document.createElement('div');
     group.className = 'filter-group';
     const bodyId = 'fg-' + col.replace(/[^a-z0-9]/gi, '_');
+    const isBoolean = BOOLEAN_COLS.includes(col);
     group.innerHTML = `
       <div class="filter-group-header" onclick="toggleGroup(this)">
         <span>${col}</span><span class="arrow">▾</span>
       </div>
       <div class="filter-group-body" id="${bodyId}">
-        ${values.map(v => {
+        ${isBoolean ? `
+        <div class="bool-toggle" data-col="${escHtml(col)}">
+          <button class="bool-btn" data-state="dc" data-val="Yes" onclick="cycleBool(this)">Yes</button>
+          <button class="bool-btn" data-state="dc" data-val="No" onclick="cycleBool(this)">No</button>
+        </div>` :
+        values.map(v => {
           const count = allData.filter(r => splitCell(r[col]||'').includes(v)).length;
           return `<div class="filter-item">
             <span class="tri-btn" data-state="dc" data-col="${escHtml(col)}" data-val="${escHtml(v)}" onclick="cycleFilter(this)">–</span>
@@ -816,6 +848,9 @@ function clearAllFilters() {
     btn.dataset.state = 'dc';
     btn.textContent = '–';
   });
+  document.querySelectorAll('.bool-btn').forEach(btn => {
+    btn.dataset.state = 'dc';
+  });
   document.getElementById('text-search').value = '';
   renderPills();
   applyFilters();
@@ -841,8 +876,14 @@ function removeTri(col, val) {
     delete filters[col][val];
     if (Object.keys(filters[col]).length === 0) delete filters[col];
   }
-  const btn = document.querySelector(`.tri-btn[data-col="${col}"][data-val="${val}"]`);
-  if (btn) { btn.dataset.state = 'dc'; btn.textContent = '–'; }
+  // Reset tri-state button if present
+  const triBtn = document.querySelector(`.tri-btn[data-col="${col}"][data-val="${val}"]`);
+  if (triBtn) { triBtn.dataset.state = 'dc'; triBtn.textContent = '–'; }
+  // Reset bool button if present
+  const boolBtn = document.querySelector(`.bool-btn[data-val="${val}"]`);
+  if (boolBtn && boolBtn.closest('.bool-toggle').dataset.col === col) {
+    boolBtn.dataset.state = 'dc';
+  }
   renderPills();
   applyFilters();
 }
@@ -970,3 +1011,4 @@ function escJs(s) {
 </script>
 </body>
 </html>
+
