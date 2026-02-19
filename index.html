@@ -844,6 +844,12 @@ function applyFilters() {
   // sort
   if (sortCol) {
     rows = [...rows].sort((a,b) => {
+      // Sort Duration numerically (stored as seconds)
+      if (sortCol === 'Duration') {
+        const an = parseFloat(a[sortCol]) || 0;
+        const bn = parseFloat(b[sortCol]) || 0;
+        return (an - bn) * sortDir;
+      }
       const av = (a[sortCol]||'').toLowerCase();
       const bv = (b[sortCol]||'').toLowerCase();
       return av < bv ? -sortDir : av > bv ? sortDir : 0;
