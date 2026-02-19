@@ -873,6 +873,15 @@ function renderTable(rows) {
       if (col === 'HM Alternate Title') return `<td class="title-col">${escHtml(val)}</td>`;
       if (col === 'Link to buy' && val) return `<td><a href="${escHtml(val)}" target="_blank">Buy ↗</a></td>`;
       if (col === 'Link to listen/view' && val) return `<td><a href="${escHtml(val)}" target="_blank">Listen ↗</a></td>`;
+      if (col === 'Duration' && val) {
+        const secs = parseFloat(val);
+        if (!isNaN(secs)) {
+          const m = Math.floor(secs / 60);
+          const s = Math.floor(secs % 60);
+          const formatted = m + ':' + String(s).padStart(2, '0');
+          return `<td>${formatted}</td>`;
+        }
+      }
       if (['Techniques','Occasion'].includes(col) && val) return `<td><span class="badge">${escHtml(val)}</span></td>`;
       return `<td title="${escHtml(val)}">${escHtml(val)}</td>`;
     }).join('') + '</tr>'
