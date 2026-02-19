@@ -676,6 +676,7 @@ function applyFilters() {
   // Cells may contain comma-separated values (e.g. "3, 5"), so we split each
   // cell and check whether any token matches any checked filter value.
   Object.entries(filters).forEach(([col, vals]) => {
+    if (col === '__duration__') return; // handled separately below
     rows = rows.filter(r => splitCell(r[col] || '').some(token => vals.has(token)));
   });
 
