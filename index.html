@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Handbell Music Catalog</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;1,400&family=Libre+Franklin:wght@300;400;500&display=swap');
+
+  :root {
+    --ink: #1a1410;
+    --parchment: #f5f0e8;
+    --cream: #faf7f2;
+    --gold: #b8860b;
+    --gold-light: #d4a843;
+    --rust: #8b3a2a;
+    --sage: #5a6e4e;
+    --rule: #d4c9b0;
+    --sidebar-w: 300px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Libre Franklin', sans-serif;
+    background: var(--cream);
+    color: var(--ink);
+    min-height: 100vh;
+  }
+
+  /* ── Header ── */
+  header {
+    background: var(--ink);
+    color: var(--parchment);
+    padding: 28px 40px 22px;
+    border-bottom: 3px solid var(--gold);
+    display: flex;
+    align-items: flex-end;
+    gap: 24px;
+  }
+  header .bell-icon { font-size: 2.2rem; line-height: 1; }
+  header h1 {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.9rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+  }
+  header p {
+    font-size: 0.78rem;
+    color: #a09880;
+    font-weight: 300;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-top: 3px;
+  }
+  .header-text { flex: 1; }
+  .result-count {
+    font-size: 0.85rem;
+    color: var(--gold-light);
+    font-weight: 300;
+    letter-spacing: 0.05em;
+    align-self: center;
+    white-space: nowrap;
+  }
+
+  /* ── Layout ── */
+  .layout {
+    display: flex;
+    min-height: calc(100vh - 100px);
+  }
+
+  /* ── Sidebar ── */
+  aside {
+    width: var(--sidebar-w);
+    min-width: var(--sidebar-w);
+    background: var(--parchment);
+    border-right: 1px solid var(--rule);
+    padding: 0;
+    overflow-y: auto;
+    max-height: calc(100vh - 100px);
+    position: sticky;
+    top: 0;
+  }
+
+  .sidebar-header {
+    padding: 18px 20px 14px;
+    border-bottom: 2px solid var(--rule);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: sticky;
+    top: 0;
+    background: var(--parchment);
+    z-index: 10;
+  }
+  .sidebar-header span {
+    font-family: 'Playfair Display', serif;
+    font-size: 1rem;
+    font-style: italic;
+    color: var(--gold);
+  }
+  .clear-btn {
+    font-size: 0.7rem;
+    font-family: 'Libre Franklin', sans-serif;
+    font-weight: 500;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--rust);
+    background: none;
+    border: 1px solid var(--rust);
+    padding: 3px 8px;
+    cursor: pointer;
+    border-radius: 2px;
+    transition: all 0.15s;
+  }
+  .clear-btn:hover { background: var(--rust); color: white; }
+
+  .filter-group {
+    border-bottom: 1px solid var(--rule);
+  }
+  .filter-group-header {
+    padding: 11px 20px;
+    font-size: 0.68rem;
+    font-weight: 500;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #7a6e5e;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    user-select: none;
+    transition: background 0.1s;
+  }
+  .filter-group-header:hover { background: #ede8de; }
+  .filter-group-header .arrow {
+    font-size: 0.6rem;
+    color: var(--gold);
+    transition: transform 0.2s;
+  }
+  .filter-group-header.open .arrow { transform: rotate(180deg); }
+  .filter-group-body {
+    display: none;
+    padding: 8px 20px 12px;
+    background: #faf8f3;
+    max-height: 200px;
+    overflow-y: auto;
+  }
+  .filter-group-body.open { display: block; }
+  .filter-group-body label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.8rem;
+    font-weight: 300;
+    padding: 3px 0;
+    cursor: pointer;
+    color: #3a3028;
+    transition: color 0.1s;
+  }
+  .filter-group-body label:hover { color: var(--gold); }
+  .filter-group-body input[type=checkbox] {
+    accent-color: var(--gold);
+    width: 13px; height: 13px;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  .filter-group-body .count {
+    margin-left: auto;
+    font-size: 0.68rem;
+    color: #a09880;
+    font-weight: 300;
+  }
+
+  /* ── Main content ── */
+  main {
+    flex: 1;
+    padding: 24px 32px;
+    overflow-x: auto;
+  }
+
+  /* ── Upload zone ── */
+  .upload-zone {
+    border: 2px dashed var(--rule);
+    border-radius: 4px;
+    padding: 40px;
+    text-align: center;
+    margin-bottom: 24px;
+    background: #faf7f0;
+    transition: border-color 0.2s;
+  }
+  .upload-zone:hover { border-color: var(--gold); }
+  .upload-zone h2 {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.3rem;
+    font-weight: 400;
+    font-style: italic;
+    color: var(--gold);
+    margin-bottom: 8px;
+  }
+  .upload-zone p { font-size: 0.82rem; color: #7a6e5e; font-weight: 300; margin-bottom: 18px; }
+  .upload-btn {
+    display: inline-block;
+    background: var(--ink);
+    color: var(--parchment);
+    padding: 10px 24px;
+    font-family: 'Libre Franklin', sans-serif;
+    font-size: 0.78rem;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    cursor: pointer;
+    border: none;
+    border-radius: 2px;
+    transition: background 0.15s;
+  }
+  .upload-btn:hover { background: var(--rust); }
+  #file-input { display: none; }
+  .sample-btn {
+    display: inline-block;
+    margin-left: 12px;
+    background: none;
+    color: var(--gold);
+    padding: 10px 20px;
+    font-family: 'Libre Franklin', sans-serif;
+    font-size: 0.78rem;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    cursor: pointer;
+    border: 1px solid var(--gold);
+    border-radius: 2px;
+    transition: all 0.15s;
+  }
+  .sample-btn:hover { background: var(--gold); color: white; }
+
+  /* ── Search bar ── */
+  .search-bar {
+    margin-bottom: 20px;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+  }
+  .search-bar input {
+    flex: 1;
+    border: 1px solid var(--rule);
+    background: white;
+    padding: 9px 14px;
+    font-family: 'Libre Franklin', sans-serif;
+    font-size: 0.85rem;
+    font-weight: 300;
+    color: var(--ink);
+    border-radius: 2px;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  .search-bar input:focus { border-color: var(--gold); }
+  .search-bar input::placeholder { color: #b0a898; }
+
+  /* ── Table ── */
+  .table-wrap { overflow-x: auto; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.8rem;
+    min-width: 900px;
+  }
+  thead tr {
+    background: var(--ink);
+    color: var(--parchment);
+  }
+  th {
+    padding: 10px 12px;
+    text-align: left;
+    font-weight: 500;
+    font-size: 0.68rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    cursor: pointer;
+    user-select: none;
+  }
+  th:hover { background: #2e2820; }
+  th.sorted-asc::after { content: ' ▲'; color: var(--gold-light); font-size: 0.6rem; }
+  th.sorted-desc::after { content: ' ▼'; color: var(--gold-light); font-size: 0.6rem; }
+
+  tbody tr {
+    border-bottom: 1px solid var(--rule);
+    transition: background 0.1s;
+  }
+  tbody tr:nth-child(even) { background: #faf7f0; }
+  tbody tr:hover { background: #f0ead8; }
+  td {
+    padding: 9px 12px;
+    vertical-align: top;
+    color: #2e2820;
+    font-weight: 300;
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  td.title-col {
+    font-family: 'Playfair Display', serif;
+    font-style: italic;
+    font-size: 0.85rem;
+    font-weight: 400;
+    color: var(--ink);
+    white-space: normal;
+    min-width: 180px;
+  }
+  td a {
+    color: var(--gold);
+    text-decoration: none;
+    font-size: 0.75rem;
+  }
+  td a:hover { text-decoration: underline; }
+
+  .badge {
+    display: inline-block;
+    background: var(--parchment);
+    border: 1px solid var(--rule);
+    color: #5a5040;
+    font-size: 0.65rem;
+    padding: 1px 6px;
+    border-radius: 10px;
+    white-space: nowrap;
+    font-weight: 400;
+  }
+
+  .empty-state {
+    text-align: center;
+    padding: 60px;
+    color: #a09880;
+  }
+  .empty-state h3 {
+    font-family: 'Playfair Display', serif;
+    font-style: italic;
+    font-size: 1.4rem;
+    font-weight: 400;
+    margin-bottom: 8px;
+  }
+  .empty-state p { font-size: 0.82rem; font-weight: 300; }
+
+  /* scrollbar styling */
+  aside::-webkit-scrollbar,
+  .filter-group-body::-webkit-scrollbar { width: 4px; }
+  aside::-webkit-scrollbar-track,
+  .filter-group-body::-webkit-scrollbar-track { background: transparent; }
+  aside::-webkit-scrollbar-thumb { background: var(--rule); border-radius: 2px; }
+
+  /* Active filter pills */
+  .active-filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 14px;
+  }
+  .pill {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    background: var(--ink);
+    color: var(--parchment);
+    font-size: 0.7rem;
+    font-weight: 400;
+    padding: 3px 9px 3px 9px;
+    border-radius: 20px;
+    letter-spacing: 0.02em;
+  }
+  .pill .remove {
+    cursor: pointer;
+    color: #a09880;
+    font-size: 0.75rem;
+    line-height: 1;
+    transition: color 0.1s;
+  }
+  .pill .remove:hover { color: var(--gold-light); }
+  .pill .field { color: var(--gold-light); margin-right: 2px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="bell-icon">🔔</div>
+  <div class="header-text">
+    <h1>Handbell Music Catalog</h1>
+    <p>Search &amp; Filter Your Library</p>
+  </div>
+  <div class="result-count" id="result-count"></div>
+</header>
+
+<div class="layout">
+  <aside id="sidebar">
+    <div class="sidebar-header">
+      <span>Filters</span>
+      <button class="clear-btn" onclick="clearAllFilters()">Clear All</button>
+    </div>
+    <div id="filter-groups"></div>
+  </aside>
+
+  <main>
+    <div class="upload-zone" id="upload-zone">
+      <h2>Load Your Spreadsheet</h2>
+      <p>Export your handbell catalog as a CSV file from Excel, then upload it here.<br>
+      Column headers should match exactly (HM Code, HM Title, Publisher, etc.)</p>
+      <button class="upload-btn" onclick="document.getElementById('file-input').click()">Upload CSV File</button>
+      <button class="sample-btn" onclick="loadSampleData()">Try Sample Data</button>
+      <input type="file" id="file-input" accept=".csv,.tsv" onchange="handleFile(event)">
+    </div>
+
+    <div id="search-area" style="display:none">
+      <div class="search-bar">
+        <input type="text" id="text-search" placeholder="Search by title, composer, arranger, HM code…" oninput="applyFilters()">
+      </div>
+      <div class="active-filters" id="active-filters"></div>
+    </div>
+
+    <div class="table-wrap">
+      <table id="results-table" style="display:none">
+        <thead id="table-head"></thead>
+        <tbody id="table-body"></tbody>
+      </table>
+      <div class="empty-state" id="empty-state" style="display:none">
+        <h3>No results found</h3>
+        <p>Try adjusting your filters or search terms.</p>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+// ── Config ──────────────────────────────────────────
+const FILTER_COLS = [
+  'Publisher','Type','Composer','Arranger','Level',
+  'Octaves of bells','Octaves of chimes',
+  'Key signature changes','Accidentals','Key signature(s)',
+  'Time signature changes','Time signature(s)',
+  'Notes','Repeats','Techniques','Number of pages'
+];
+
+const DISPLAY_COLS = [
+  'HM Code','HM Title','HM Alternate Title','Arrangement of',
+  'Composer','Arranger','Publisher','Type','Level',
+  'Octaves of bells','Octaves of chimes','Occasion',
+  'Duration','Key signature(s)','Time signature(s)',
+  'Techniques','Link to buy','Link to listen/view'
+];
+
+const TEXT_SEARCH_COLS = ['HM Code','HM Title','HM Alternate Title','Composer','Arranger','Arrangement of'];
+
+// ── State ───────────────────────────────────────────
+let allData = [];
+let filters = {}; // { col: Set of values }
+let sortCol = null;
+let sortDir = 1;
+
+// ── File Loading ─────────────────────────────────────
+function handleFile(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  Papa.parse(file, {
+    header: true,
+    skipEmptyLines: true,
+    complete: r => initData(r.data)
+  });
+}
+
+function loadSampleData() {
+  const cols = ['HM Code','HM Title','HM Alternate Title','Arrangement of','Publisher','Type','Composer','Arranger','Level','Octaves of bells','Octaves of chimes','Occasion','Duration','Key signature changes','Accidentals','Key signature(s)','Time signature changes','Time signature(s)','Notes','Repeats','Techniques','Original copyright','Current copyright','Number of pages','Link to buy','Link to listen/view'];
+  const sample = [
+    ['HB001','Gloria in Excelsis','Glory Song','Traditional','Agape','Sacred','arr. Trad.','John Smith','Level 3','3','2','Christmas','3:20','No','Yes','G major','No','4/4','Ring clearly','Yes','Martellato, Mallets','1985','2010','4','https://example.com','https://youtube.com'],
+    ['HB002','A Mighty Fortress','','Bach','Choristers Guild','Sacred','J.S. Bach','Mary Johnson','Level 2','2','0','General','2:45','No','No','D major','No','4/4','Standard','No','Basic Ringing','1999','2005','3','','https://youtube.com'],
+    ['HB003','Joy to the World','','Handel/Watts','Hope Publishing','Sacred','G.F. Handel','Robert Lee','Level 4','5','3','Christmas','2:00','No','Yes','D major','Yes','2/4, 4/4','','Yes','Gyro, Martellato','1990','2015','6','https://example.com',''],
+    ['HB004','Amazing Grace','','Traditional','Agape','Sacred','Trad.','Susan Park','Level 1','2','0','General','3:00','No','No','F major','No','3/4','','No','Basic Ringing','2001','2001','2','','https://youtube.com'],
+    ['HB005','Joyful Joyful','Hymn to Joy','Beethoven','Lorenz','Sacred','L. van Beethoven','David Kim','Level 3','3','2','General','2:30','No','No','Bb major','No','4/4','','Yes','Mallets','1995','2008','4','https://example.com','https://youtube.com'],
+    ['HB006','Spring Suite','','Original','Carl Fischer','Secular','Patricia Moore','Patricia Moore','Level 5','5','4','Spring','5:00','Yes','Yes','C major','Yes','3/4, 6/8','Complex piece','Yes','Gyro, Pluck, LV','2005','2020','10','https://example.com',''],
+    ['HB007','Alleluia','','Original','Agape','Sacred','William Jones','','Level 2','2','0','Easter','1:30','No','No','G major','No','4/4','','No','Basic Ringing','2010','2010','2','','https://youtube.com'],
+    ['HB008','Celtic Bells','','Original','Choristers Guild','Secular','Fiona Walsh','Fiona Walsh','Level 4','4','3','General','4:00','Yes','No','D minor','No','6/8','','Yes','Martellato, Gyro','2012','2018','7','https://example.com','https://youtube.com'],
+  ];
+  const data = sample.map(row => {
+    const obj = {};
+    cols.forEach((c,i) => obj[c] = row[i] || '');
+    return obj;
+  });
+  initData(data);
+}
+
+// ── Init ─────────────────────────────────────────────
+function initData(data) {
+  allData = data;
+  filters = {};
+  document.getElementById('upload-zone').style.display = 'none';
+  document.getElementById('search-area').style.display = 'block';
+  document.getElementById('results-table').style.display = 'table';
+  buildTableHeader();
+  buildFilterSidebar();
+  applyFilters();
+}
+
+// ── Table Header ──────────────────────────────────────
+function buildTableHeader() {
+  const head = document.getElementById('table-head');
+  const available = DISPLAY_COLS.filter(c => allData[0] && c in allData[0]);
+  head.innerHTML = '<tr>' + available.map(col =>
+    `<th onclick="sortBy('${col}')" data-col="${col}">${col}</th>`
+  ).join('') + '</tr>';
+}
+
+// ── Filter Sidebar ────────────────────────────────────
+function buildFilterSidebar() {
+  const container = document.getElementById('filter-groups');
+  container.innerHTML = '';
+  const available = FILTER_COLS.filter(c => allData[0] && c in allData[0]);
+  available.forEach(col => {
+    const values = [...new Set(allData.map(r => r[col]).filter(v => v && v.trim()))].sort();
+    if (values.length < 2) return;
+    const group = document.createElement('div');
+    group.className = 'filter-group';
+    group.innerHTML = `
+      <div class="filter-group-header" onclick="toggleGroup(this)">
+        <span>${col}</span><span class="arrow">▾</span>
+      </div>
+      <div class="filter-group-body">
+        ${values.map(v => `
+          <label>
+            <input type="checkbox" data-col="${col}" value="${escHtml(v)}" onchange="onCheckbox(this)">
+            <span>${escHtml(v)}</span>
+            <span class="count">${allData.filter(r=>r[col]===v).length}</span>
+          </label>`).join('')}
+      </div>`;
+    container.appendChild(group);
+  });
+}
+
+function toggleGroup(header) {
+  header.classList.toggle('open');
+  header.nextElementSibling.classList.toggle('open');
+}
+
+// ── Checkbox Handling ──────────────────────────────────
+function onCheckbox(cb) {
+  const col = cb.dataset.col;
+  const val = cb.value;
+  if (!filters[col]) filters[col] = new Set();
+  if (cb.checked) filters[col].add(val);
+  else {
+    filters[col].delete(val);
+    if (filters[col].size === 0) delete filters[col];
+  }
+  renderPills();
+  applyFilters();
+}
+
+function clearAllFilters() {
+  filters = {};
+  document.querySelectorAll('input[type=checkbox]').forEach(cb => cb.checked = false);
+  document.getElementById('text-search').value = '';
+  renderPills();
+  applyFilters();
+}
+
+function renderPills() {
+  const container = document.getElementById('active-filters');
+  container.innerHTML = '';
+  Object.entries(filters).forEach(([col, vals]) => {
+    vals.forEach(val => {
+      const pill = document.createElement('div');
+      pill.className = 'pill';
+      pill.innerHTML = `<span class="field">${col}:</span> ${escHtml(val)} <span class="remove" onclick="removePill('${col}','${escJs(val)}')">✕</span>`;
+      container.appendChild(pill);
+    });
+  });
+}
+
+function removePill(col, val) {
+  if (filters[col]) {
+    filters[col].delete(val);
+    if (filters[col].size === 0) delete filters[col];
+  }
+  const cb = document.querySelector(`input[data-col="${col}"][value="${val}"]`);
+  if (cb) cb.checked = false;
+  renderPills();
+  applyFilters();
+}
+
+// ── Filtering ─────────────────────────────────────────
+function applyFilters() {
+  const query = (document.getElementById('text-search').value || '').toLowerCase().trim();
+  let rows = allData;
+
+  // checkbox filters — AND across columns, OR within each column
+  Object.entries(filters).forEach(([col, vals]) => {
+    rows = rows.filter(r => vals.has(r[col]));
+  });
+
+  // text search
+  if (query) {
+    rows = rows.filter(r =>
+      TEXT_SEARCH_COLS.some(c => (r[c]||'').toLowerCase().includes(query))
+    );
+  }
+
+  // sort
+  if (sortCol) {
+    rows = [...rows].sort((a,b) => {
+      const av = (a[sortCol]||'').toLowerCase();
+      const bv = (b[sortCol]||'').toLowerCase();
+      return av < bv ? -sortDir : av > bv ? sortDir : 0;
+    });
+  }
+
+  renderTable(rows);
+  document.getElementById('result-count').textContent =
+    `${rows.length} of ${allData.length} piece${allData.length !== 1 ? 's' : ''}`;
+}
+
+// ── Table Render ──────────────────────────────────────
+function renderTable(rows) {
+  const available = DISPLAY_COLS.filter(c => allData[0] && c in allData[0]);
+  const tbody = document.getElementById('table-body');
+  const empty = document.getElementById('empty-state');
+  if (rows.length === 0) {
+    tbody.innerHTML = '';
+    empty.style.display = 'block';
+    return;
+  }
+  empty.style.display = 'none';
+  tbody.innerHTML = rows.map(row =>
+    '<tr>' + available.map(col => {
+      const val = row[col] || '';
+      if (col === 'HM Title' || col === 'HM Alternate Title') return `<td class="title-col">${escHtml(val)}</td>`;
+      if (col === 'Link to buy' && val) return `<td><a href="${escHtml(val)}" target="_blank">Buy ↗</a></td>`;
+      if (col === 'Link to listen/view' && val) return `<td><a href="${escHtml(val)}" target="_blank">Listen ↗</a></td>`;
+      if (['Techniques','Occasion'].includes(col) && val) return `<td><span class="badge">${escHtml(val)}</span></td>`;
+      return `<td title="${escHtml(val)}">${escHtml(val)}</td>`;
+    }).join('') + '</tr>'
+  ).join('');
+}
+
+// ── Sorting ───────────────────────────────────────────
+function sortBy(col) {
+  if (sortCol === col) sortDir *= -1;
+  else { sortCol = col; sortDir = 1; }
+  document.querySelectorAll('th').forEach(th => {
+    th.classList.remove('sorted-asc','sorted-desc');
+    if (th.dataset.col === col) th.classList.add(sortDir === 1 ? 'sorted-asc' : 'sorted-desc');
+  });
+  applyFilters();
+}
+
+// ── Utils ─────────────────────────────────────────────
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function escJs(s) {
+  return String(s).replace(/'/g,"\\'");
+}
+</script>
+</body>
+</html>
