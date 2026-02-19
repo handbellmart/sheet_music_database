@@ -725,7 +725,8 @@ function renderTable(rows) {
   tbody.innerHTML = rows.map(row =>
     '<tr>' + available.map(col => {
       const val = row[col] || '';
-      if (col === 'HM Title' || col === 'HM Alternate Title') return `<td class="title-col">${escHtml(val)}</td>`;
+      if (col === 'HM Title') { const link = row['Link to buy']; return link ? `<td class="title-col"><a href="${escHtml(link)}" target="_blank" style="color:inherit;text-decoration:underline;text-decoration-color:var(--gold);text-underline-offset:3px;">${escHtml(val)}</a></td>` : `<td class="title-col">${escHtml(val)}</td>`; }
+      if (col === 'HM Alternate Title') return `<td class="title-col">${escHtml(val)}</td>`;
       if (col === 'Link to buy' && val) return `<td><a href="${escHtml(val)}" target="_blank">Buy ↗</a></td>`;
       if (col === 'Link to listen/view' && val) return `<td><a href="${escHtml(val)}" target="_blank">Listen ↗</a></td>`;
       if (['Techniques','Occasion'].includes(col) && val) return `<td><span class="badge">${escHtml(val)}</span></td>`;
